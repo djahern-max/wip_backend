@@ -23,7 +23,7 @@ class UserInDB(UserBase):
     is_superuser: bool
     created_at: datetime
     updated_at: Optional[datetime]
-    
+
     class Config:
         from_attributes = True
 

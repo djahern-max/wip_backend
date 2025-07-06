@@ -33,6 +33,10 @@ class Settings(BaseSettings):
     # Google Cloud
     google_application_credentials: Optional[str] = None
 
+    # Encryption
+    encryption_key: Optional[str] = None
+    database_encryption_enabled: bool = True
+
     class Config:
         env_file = ".env"
 

@@ -44,9 +44,9 @@ async def extract_contract_text(
         # Save to simplified contracts table
         db_contract = Contract(
             filename=file.filename,
-            raw_text=raw_text,
             is_processed=True,
         )
+        db_contract.set_raw_text_secure(raw_text)
 
         db.add(db_contract)
         db.commit()
@@ -65,14 +65,17 @@ async def extract_contract_text(
         raise HTTPException(status_code=500, detail=f"Text extraction failed: {str(e)}")
 
 
-@router.post("/analyze/{contract_id}", response_model=ContractAnalysisResponse)
+# app/api/contracts.py - Updated /analyze endpoint with proper encryption
+
+
+@router.post("/analyze/{contract_id}")
 async def analyze_contract(
     contract_id: int,
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db),
 ):
     """
-    Analyze contract using Claude AI and store results in contract_analyses table
+    Analyze contract using Claude AI and store results SECURELY with encryption
     """
 
     # Get contract from database
@@ -80,7 +83,14 @@ async def analyze_contract(
     if not contract:
         raise HTTPException(status_code=404, detail="Contract not found")
 
-    if not contract.raw_text:
+    # Get raw text (with decryption support)
+    raw_text = (
+        contract.get_raw_text_secure()
+        if hasattr(contract, "get_raw_text_secure")
+        else contract.raw_text
+    )
+
+    if not raw_text:
         raise HTTPException(
             status_code=422, detail="No text found - extract text first"
         )
@@ -99,15 +109,18 @@ async def analyze_contract(
             "analysis_id": existing_analysis.id,
             "extracted_data": {
                 "contract_number": existing_analysis.contract_number,
-                "contract_name": existing_analysis.contract_name,
+                "contract_name": existing_analysis.get_contract_name_secure(),
                 "contract_value": (
                     str(existing_analysis.contract_value)
                     if existing_analysis.contract_value
                     else None
                 ),
-                "contractor_name": existing_analysis.contractor_name,
-                "subcontractor_name": existing_analysis.subcontractor_name,
-                "project_location": existing_analysis.project_location,
+                "contractor_name": existing_analysis.get_contractor_name_secure(),
+                "subcontractor_name": existing_analysis.get_subcontractor_name_secure(),
+                "owner_name": existing_analysis.get_owner_name_secure(),
+                "project_location": existing_analysis.get_project_location_secure(),
+                "work_description": existing_analysis.get_work_description_secure(),
+                "payment_terms": existing_analysis.get_payment_terms_secure(),
                 "agreement_date": (
                     existing_analysis.agreement_date.isoformat()
                     if existing_analysis.agreement_date
@@ -123,7 +136,7 @@ async def analyze_contract(
         analyzer = ComprehensiveClaudeAnalyzer()
 
         # Analyze the contract
-        analysis_result = analyzer.analyze_contract(contract.raw_text)
+        analysis_result = analyzer.analyze_contract(raw_text)
 
         if not analysis_result["success"]:
             raise HTTPException(status_code=500, detail="Contract analysis failed")
@@ -131,53 +144,60 @@ async def analyze_contract(
         # Extract the data from the nested structure
         extracted_data = analysis_result["data"]
 
-        # Create new analysis record
+        # Create new analysis record with SECURE ENCRYPTION
         db_analysis = ContractAnalysis(
             contract_id=contract_id,
+            # Store NON-sensitive data in plain text (safe)
             contract_number=extracted_data.get("contract_number"),
-            contract_name=extracted_data.get("contract_name"),
             contract_value=extracted_data.get("contract_value"),
-            contractor_name=extracted_data.get("contractor_name"),
-            subcontractor_name=extracted_data.get("subcontractor_name"),
-            owner_name=extracted_data.get("owner_name"),
             agreement_date=extracted_data.get("agreement_date"),
             start_date=extracted_data.get("start_date"),
             end_date=extracted_data.get("end_date"),
-            project_location=extracted_data.get("project_location"),
-            work_description=extracted_data.get("work_description"),
             project_type=extracted_data.get("project_type"),
-            payment_terms=extracted_data.get("payment_terms"),
             retainage_percentage=extracted_data.get("retainage_percentage"),
             insurance_required=extracted_data.get("insurance_required", False),
             bond_required=extracted_data.get("bond_required", False),
-            insurance_amount=extracted_data.get("insurance_amount"),
-            bond_amount=extracted_data.get("bond_amount"),
             ai_provider=extracted_data.get("ai_provider"),
             confidence_score=extracted_data.get("confidence_score"),
         )
 
+        # Store SENSITIVE data using ENCRYPTED methods
+        db_analysis.set_contractor_name_secure(extracted_data.get("contractor_name"))
+        db_analysis.set_subcontractor_name_secure(
+            extracted_data.get("subcontractor_name")
+        )
+        db_analysis.set_owner_name_secure(extracted_data.get("owner_name"))
+        db_analysis.set_contract_name_secure(extracted_data.get("contract_name"))
+        db_analysis.set_project_location_secure(extracted_data.get("project_location"))
+        db_analysis.set_work_description_secure(extracted_data.get("work_description"))
+        db_analysis.set_payment_terms_secure(extracted_data.get("payment_terms"))
+        db_analysis.set_insurance_amount_secure(extracted_data.get("insurance_amount"))
+        db_analysis.set_bond_amount_secure(extracted_data.get("bond_amount"))
+
+        # Save to database
         db.add(db_analysis)
         db.commit()
         db.refresh(db_analysis)
 
         return {
-            "message": "Contract analyzed successfully using Claude AI",
+            "message": "Contract analyzed successfully using Claude AI with ENCRYPTION",
             "contract_id": contract.id,
             "analysis_id": db_analysis.id,
             "extracted_data": {
                 "contract_number": db_analysis.contract_number,
-                "contract_name": db_analysis.contract_name,
+                "contract_name": db_analysis.get_contract_name_secure(),
                 "contract_value": (
                     str(db_analysis.contract_value)
                     if db_analysis.contract_value
                     else None
                 ),
-                "contractor_name": db_analysis.contractor_name,
-                "subcontractor_name": db_analysis.subcontractor_name,
-                "owner_name": db_analysis.owner_name,
-                "project_location": db_analysis.project_location,
-                "work_description": db_analysis.work_description,
+                "contractor_name": db_analysis.get_contractor_name_secure(),
+                "subcontractor_name": db_analysis.get_subcontractor_name_secure(),
+                "owner_name": db_analysis.get_owner_name_secure(),
+                "project_location": db_analysis.get_project_location_secure(),
+                "work_description": db_analysis.get_work_description_secure(),
                 "project_type": db_analysis.project_type,
+                "payment_terms": db_analysis.get_payment_terms_secure(),
                 "agreement_date": (
                     db_analysis.agreement_date.isoformat()
                     if db_analysis.agreement_date
@@ -193,11 +213,22 @@ async def analyze_contract(
                 ),
                 "insurance_required": db_analysis.insurance_required,
                 "bond_required": db_analysis.bond_required,
+                "insurance_amount": (
+                    str(db_analysis.get_insurance_amount_secure())
+                    if db_analysis.get_insurance_amount_secure()
+                    else None
+                ),
+                "bond_amount": (
+                    str(db_analysis.get_bond_amount_secure())
+                    if db_analysis.get_bond_amount_secure()
+                    else None
+                ),
             },
             "analysis_provider": db_analysis.ai_provider,
             "fields_extracted": analysis_result.get("fields_extracted", 0),
             "total_possible_fields": analysis_result.get("total_possible_fields", 18),
             "text_length": analysis_result.get("text_length"),
+            "security_status": "ENCRYPTED",
         }
 
     except Exception as e:
