@@ -54,3 +54,5 @@ logs/
 wip-manager-google-credentials.json
 *.bak
 .env*
+
+notes.txt
