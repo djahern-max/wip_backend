@@ -1,8 +1,8 @@
-"""add encryption columns for sensitive data
+"""initial migration with encryption
 
-Revision ID: 58ba1604aa78
+Revision ID: ea4ce3266dda
 Revises: 
-Create Date: 2025-07-06 10:13:15.171341
+Create Date: 2025-07-06 12:02:54.998960
 
 """
 from typing import Sequence, Union
@@ -12,7 +12,7 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision: str = '58ba1604aa78'
+revision: str = 'ea4ce3266dda'
 down_revision: Union[str, None] = None
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
@@ -23,7 +23,7 @@ def upgrade() -> None:
     op.create_table('contracts',
     sa.Column('id', sa.Integer(), nullable=False),
     sa.Column('filename', sa.String(), nullable=False),
-    sa.Column('raw_text', sa.Text(), nullable=True),
+    sa.Column('raw_text_encrypted', sa.Text(), nullable=False),
     sa.Column('is_processed', sa.Boolean(), nullable=True),
     sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=True),
     sa.PrimaryKeyConstraint('id')
@@ -48,23 +48,14 @@ def upgrade() -> None:
     sa.Column('id', sa.Integer(), nullable=False),
     sa.Column('contract_id', sa.Integer(), nullable=False),
     sa.Column('contract_number', sa.String(), nullable=True),
-    sa.Column('contract_name', sa.String(), nullable=True),
     sa.Column('contract_value', sa.Numeric(precision=15, scale=2), nullable=True),
-    sa.Column('contractor_name', sa.String(), nullable=True),
-    sa.Column('subcontractor_name', sa.String(), nullable=True),
-    sa.Column('owner_name', sa.String(), nullable=True),
     sa.Column('agreement_date', sa.DateTime(), nullable=True),
     sa.Column('start_date', sa.DateTime(), nullable=True),
     sa.Column('end_date', sa.DateTime(), nullable=True),
-    sa.Column('project_location', sa.String(), nullable=True),
-    sa.Column('work_description', sa.Text(), nullable=True),
     sa.Column('project_type', sa.String(), nullable=True),
-    sa.Column('payment_terms', sa.Text(), nullable=True),
     sa.Column('retainage_percentage', sa.Numeric(precision=5, scale=2), nullable=True),
     sa.Column('insurance_required', sa.Boolean(), nullable=True),
     sa.Column('bond_required', sa.Boolean(), nullable=True),
-    sa.Column('insurance_amount', sa.Numeric(precision=15, scale=2), nullable=True),
-    sa.Column('bond_amount', sa.Numeric(precision=15, scale=2), nullable=True),
     sa.Column('ai_provider', sa.String(), nullable=True),
     sa.Column('analysis_date', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=True),
     sa.Column('confidence_score', sa.Numeric(precision=3, scale=2), nullable=True),
