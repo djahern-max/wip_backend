@@ -29,7 +29,7 @@ class Contract(Base):
     # ONLY encrypted storage - no plain text
     raw_text_encrypted = Column(Text, nullable=False)
 
-    # NEW: Future-ready fields (nullable for MVP compatibility)
+    # Future-ready fields (nullable for MVP compatibility)
     company_id = Column(Integer, ForeignKey("companies.id"), nullable=True)
     job_number = Column(String(100), nullable=True)
     job_name = Column(String(255), nullable=True)
@@ -38,8 +38,11 @@ class Contract(Base):
     is_processed = Column(Boolean, default=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
-    # Relationship
+    # Relationships
     company = relationship("Company", back_populates="contracts")
+    analysis = relationship(
+        "ContractAnalysis", back_populates="contract", uselist=False
+    )
 
     # Indexes for performance
     __table_args__ = (
@@ -61,3 +64,17 @@ class Contract(Base):
             self.raw_text_encrypted = encryption_service.encrypt_text(value)
         else:
             self.raw_text_encrypted = None
+
+    @property
+    def display_job_identifier(self):
+        """Get job identifier for display (job_number or auto-generated)"""
+        if self.job_number:
+            return self.job_number
+        return f"CONTRACT-{self.id}"
+
+    @property
+    def display_job_name(self):
+        """Get job name for display (job_name or filename)"""
+        if self.job_name:
+            return self.job_name
+        return self.filename.replace(".pdf", "").replace("_", " ")

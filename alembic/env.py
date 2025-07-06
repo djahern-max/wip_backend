@@ -8,11 +8,11 @@ import sys
 # Add the app directory to the Python path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
 
+# Import the database base and all models
 from app.core.database import Base
-from app.models.user import User
-from app.models.contract import Contract
-from app.models.contract_analysis import ContractAnalysis
-from app.models.company import Company
+
+# Import all models to ensure they are registered
+from app.models import Company, User, Contract, ContractAnalysis
 
 # this is the Alembic Config object
 config = context.config
@@ -30,6 +30,7 @@ target_metadata = Base.metadata
 
 
 def run_migrations_offline() -> None:
+    """Run migrations in 'offline' mode."""
     url = config.get_main_option("sqlalchemy.url")
     context.configure(
         url=url,
@@ -43,6 +44,7 @@ def run_migrations_offline() -> None:
 
 
 def run_migrations_online() -> None:
+    """Run migrations in 'online' mode."""
     connectable = engine_from_config(
         config.get_section(config.config_ini_section),
         prefix="sqlalchemy.",

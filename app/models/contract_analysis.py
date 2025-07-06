@@ -1,4 +1,4 @@
-# app/models/contract_analysis.py - CLEAN encryption-first model
+# app/models/contract_analysis.py - Fixed relationships
 from sqlalchemy import (
     Column,
     Integer,
@@ -27,6 +27,9 @@ class ContractAnalysis(Base):
     id = Column(Integer, primary_key=True, index=True)
     contract_id = Column(Integer, ForeignKey("contracts.id"), nullable=False)
 
+    # Company association (nullable for MVP compatibility)
+    company_id = Column(Integer, ForeignKey("companies.id"), nullable=True)
+
     # NON-SENSITIVE DATA (safe in plain text)
     contract_number = Column(String)  # Often public reference numbers
     contract_value = Column(Numeric(15, 2))  # Dollar amounts are less sensitive
@@ -52,8 +55,9 @@ class ContractAnalysis(Base):
     insurance_amount_encrypted = Column(String)
     bond_amount_encrypted = Column(String)
 
-    # Relationship
-    contract = relationship("Contract", backref="analysis")
+    # Relationships
+    contract = relationship("Contract", back_populates="analysis")
+    company = relationship("Company")
 
     # AUTOMATIC ENCRYPTION PROPERTIES
     @hybrid_property

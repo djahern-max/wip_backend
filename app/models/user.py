@@ -18,8 +18,8 @@ class User(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
-    # NEW: Company association (nullable for MVP compatibility)
+    # Company association (nullable for MVP compatibility)
     company_id = Column(Integer, ForeignKey("companies.id"), nullable=True)
 
-    # Relationship
+    # Relationships
     company = relationship("Company", back_populates="users")
