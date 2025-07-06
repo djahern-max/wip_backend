@@ -1,43 +1,17 @@
-from typing import Dict, Optional
-from decimal import Decimal
-import re
 from .ai_contract_analyzer import AIContractAnalyzer
 
 
-def parse_contract_data(text: str) -> Dict[str, Optional[str]]:
-    """Parse contract data using AI analysis"""
-    
-    # Initialize AI analyzer
+def parse_contract_data(text: str) -> dict:
+    """Ask direct questions about the contract - NO STRUCTURED EXTRACTION"""
+
     analyzer = AIContractAnalyzer()
-    
-    # Use AI to extract data
-    ai_result = analyzer.analyze_contract(text)
-    
-    # Process the contract value to ensure it's a proper Decimal
-    contract_value = ai_result.get("contract_value")
-    if contract_value:
-        try:
-            # Extract numeric value and convert to Decimal
-            if isinstance(contract_value, str):
-                # Remove currency symbols and commas
-                numeric_value = re.sub(r'[^\d.]', '', contract_value)
-                if numeric_value:
-                    contract_value = Decimal(numeric_value)
-                else:
-                    contract_value = None
-            elif isinstance(contract_value, (int, float)):
-                contract_value = Decimal(str(contract_value))
-        except:
-            contract_value = None
-    
+
+    # Get direct answers
+    contract_value_answer = analyzer.get_contract_value(text)
+    contract_number_answer = analyzer.get_contract_number(text)
+
     return {
-        "contract_number": ai_result.get("contract_number"),
-        "contract_name": ai_result.get("contract_name"),
-        "contract_value": contract_value,
-        "contractor_name": ai_result.get("contractor_name"),
-        "subcontractor_name": ai_result.get("subcontractor_name"),
-        "project_location": ai_result.get("project_location"),
-        "work_description": ai_result.get("work_description"),
-        "start_date": ai_result.get("start_date"),
-        "end_date": ai_result.get("end_date")
+        "contract_value_raw": contract_value_answer,
+        "contract_number_raw": contract_number_answer,
+        "analysis_type": "direct_questioning",
     }
