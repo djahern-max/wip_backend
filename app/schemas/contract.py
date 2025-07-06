@@ -12,10 +12,13 @@ from decimal import Decimal
 
 class ContractBase(BaseModel):
     filename: str
+    job_number: Optional[str] = None
+    job_name: Optional[str] = None
 
 
 class ContractCreate(ContractBase):
     raw_text: Optional[str] = None
+    company_id: Optional[int] = None
 
 
 class ContractInDB(ContractBase):
@@ -23,6 +26,7 @@ class ContractInDB(ContractBase):
     raw_text: Optional[str]
     is_processed: bool
     created_at: datetime
+    company_id: Optional[int] = None
 
     class Config:
         from_attributes = True

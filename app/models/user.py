@@ -1,5 +1,7 @@
-from sqlalchemy import Column, Integer, String, Boolean, DateTime
+# app/models/user.py
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey
 from sqlalchemy.sql import func
+from sqlalchemy.orm import relationship
 from app.core.database import Base
 
 
@@ -15,3 +17,9 @@ class User(Base):
     is_superuser = Column(Boolean, default=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+    # NEW: Company association (nullable for MVP compatibility)
+    company_id = Column(Integer, ForeignKey("companies.id"), nullable=True)
+
+    # Relationship
+    company = relationship("Company", back_populates="users")
