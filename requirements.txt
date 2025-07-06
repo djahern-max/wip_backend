@@ -17,3 +17,4 @@ email-validator==2.1.0
 openai==1.51.0
 openai==1.51.0
 google-cloud-vision==3.4.5
+anthropic>=0.25.0
