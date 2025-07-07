@@ -43,6 +43,9 @@ class Contract(Base):
     analysis = relationship(
         "ContractAnalysis", back_populates="contract", uselist=False
     )
+    intelligence = relationship(
+        "ContractIntelligence", back_populates="contract", uselist=False
+    )
 
     # Indexes for performance
     __table_args__ = (
