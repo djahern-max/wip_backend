@@ -89,7 +89,6 @@ async def analyze_directory(
     5. Ranks all documents by importance
     6. Returns actionable recommendations
 
-    Just like your script, but through the API!
     """
 
     directory_path = Path(request.directory_path)

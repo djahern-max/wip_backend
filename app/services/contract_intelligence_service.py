@@ -214,7 +214,7 @@ class ContractIntelligenceService:
 
                 if any(
                     indicator in filename
-                    for indicator in ["executed", "clean", "final"]
+                    for indicator in ["executed", "clean", "final", "r1", "signed"]
                 ):
                     main_contract = doc
                     break
@@ -250,6 +250,8 @@ class ContractIntelligenceService:
             return "Identified as clean/final version"
         elif "final" in filename:
             return "Identified as final version"
+        elif "r1" in filename or "signed" in filename:
+            return "Identified as revised/signed version"
         elif len(all_primary_contracts) > 1:
             return (
                 f"Highest scoring among {len(all_primary_contracts)} primary contracts"
@@ -265,6 +267,12 @@ class ContractIntelligenceService:
         if not contract_classifications:
             return []
 
+        # First identify the main contract
+        main_contract_data = self.identify_main_contract(contract_classifications)
+        main_filename = (
+            main_contract_data.get("filename") if main_contract_data else None
+        )
+
         # Score all documents
         scored_docs = []
         for classification in contract_classifications:
@@ -273,6 +281,15 @@ class ContractIntelligenceService:
             # Add score and ranking info to classification
             enhanced_classification = classification.copy()
             enhanced_classification["importance_score"] = score
+
+            # Set main contract flag
+            if main_filename and classification.get("filename") == main_filename:
+                enhanced_classification["is_main_contract"] = True
+                enhanced_classification["ranking_reason"] = main_contract_data.get(
+                    "ranking_reason"
+                )
+            else:
+                enhanced_classification["is_main_contract"] = False
 
             scored_docs.append(enhanced_classification)
 
@@ -284,7 +301,7 @@ class ContractIntelligenceService:
             doc["rank"] = i
 
             # Determine document priority level
-            if i == 1:
+            if doc.get("is_main_contract"):
                 doc["priority_level"] = "MAIN_CONTRACT"
             elif doc.get("document_type") == "PRIMARY_CONTRACT" and i <= 3:
                 doc["priority_level"] = "HIGH_PRIORITY"
