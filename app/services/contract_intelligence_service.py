@@ -1,34 +1,26 @@
 # app/services/contract_intelligence_service.py
 """
-Integrated Contract Intelligence Service
-Combines document classification, ranking, and hierarchy analysis
+Contract Intelligence Service - Based on your working single_job_scanner.py script
 """
 
-import json
 import requests
-from pathlib import Path
-from typing import List, Dict, Optional, Tuple
+import re
+from typing import Optional, Dict, Any, List
 from datetime import datetime
-from sqlalchemy.orm import Session
-
 from app.core.config import settings
-from app.services.pdf_extractor import extract_text_from_pdf
-from app.services.claude_contract_analyzer import ComprehensiveClaudeAnalyzer
-from app.models.contract import Contract
-from app.models.contract_analysis import ContractAnalysis
 
 
 class ContractIntelligenceService:
     """
-    Unified service for contract document intelligence
-    Handles classification, ranking, and main contract identification
+    Contract intelligence service - works exactly like your single_job_scanner.py
     """
 
     def __init__(self):
-        self.analyzer = ComprehensiveClaudeAnalyzer()
+        if not settings.anthropic_api_key:
+            raise Exception("Anthropic API key not configured")
 
     def classify_document(self, document_text: str, filename: str) -> Dict:
-        """Fast document classification using Claude"""
+        """Classify a document - exactly like your script's quick_classify_document method"""
 
         text_sample = document_text[:2000]  # Use first 2K chars for speed
 
@@ -42,11 +34,11 @@ class ContractIntelligenceService:
         
         Respond in this EXACT format:
         
-        DOCUMENT_TYPE: [PRIMARY_CONTRACT, CHANGE_ORDER, AMENDMENT, INSURANCE_DOCUMENT, CORRESPONDENCE, UNKNOWN]
+        DOCUMENT_TYPE: [PRIMARY_CONTRACT, CHANGE_ORDER, LETTER_OF_INTENT, INSURANCE_DOCUMENT, SCHEDULE, AMENDMENT, PROPOSAL, INVOICE, CORRESPONDENCE, UNKNOWN]
         IMPORTANCE: [CRITICAL, HIGH, MEDIUM, LOW]
         STATUS: [EXECUTED_SIGNED, DRAFT_UNSIGNED, PROPOSAL, EXPIRED, UNKNOWN]
-        MAIN_PARTIES: [Primary companies mentioned]
-        CONTRACT_VALUE: [Any dollar amounts, or NONE]
+        KEY_PARTIES: [Main companies mentioned]
+        DOLLAR_AMOUNT: [Any amounts, or NONE]
         PROJECT_INFO: [Brief project description]
         CONFIDENCE: [HIGH, MEDIUM, LOW]
         SUMMARY: [One sentence description]
@@ -82,20 +74,19 @@ class ContractIntelligenceService:
                 "filename": filename,
                 "error": str(e),
                 "document_type": "ERROR",
-                "importance": "UNKNOWN",
                 "recommendation": "REVIEW_MANUALLY",
             }
 
     def _parse_classification_response(self, response: str, filename: str) -> Dict:
-        """Parse Claude's structured response"""
+        """Parse Claude's response - exactly like your script's parse_response method"""
 
         result = {
             "filename": filename,
             "document_type": "UNKNOWN",
             "importance": "MEDIUM",
             "status": "UNKNOWN",
-            "main_parties": [],
-            "contract_value": "NONE",
+            "key_parties": "",
+            "dollar_amount": "NONE",
             "project_info": "",
             "confidence": "MEDIUM",
             "summary": "",
@@ -117,10 +108,10 @@ class ContractIntelligenceService:
                 result["importance"] = value
             elif "STATUS" in key:
                 result["status"] = value
-            elif "MAIN_PARTIES" in key:
-                result["main_parties"] = [p.strip() for p in value.split(",")]
-            elif "CONTRACT_VALUE" in key:
-                result["contract_value"] = value
+            elif "KEY_PARTIES" in key:
+                result["key_parties"] = value
+            elif "DOLLAR_AMOUNT" in key:
+                result["dollar_amount"] = value
             elif "PROJECT_INFO" in key:
                 result["project_info"] = value
             elif "CONFIDENCE" in key:
@@ -132,10 +123,8 @@ class ContractIntelligenceService:
 
         return result
 
-    def score_document_importance(
-        self, classification: Dict, analysis_data: Optional[Dict] = None
-    ) -> int:
-        """Calculate document importance score for ranking"""
+    def score_document_importance(self, classification: Dict) -> int:
+        """Score document for ranking - enhanced logic"""
 
         score = 0
 
@@ -159,33 +148,44 @@ class ContractIntelligenceService:
         elif classification.get("status") == "DRAFT_UNSIGNED":
             score += 10
 
-        # Filename indicators
+        # Enhanced filename analysis
         filename = classification.get("filename", "").lower()
+
+        # Strong indicators of main/final contract
         if any(word in filename for word in ["executed", "signed", "final"]):
+            score += 25
+
+        # Clean/final version indicators
+        if "clean" in filename:
             score += 20
 
-        if "revised" in filename:
-            score += 10
+        # Version progression
+        if "r1" in filename or "rev1" in filename:
+            score += 15
+        elif "r2" in filename or "rev2" in filename:
+            score += 18
+        elif "r3" in filename or "rev3" in filename:
+            score += 22
 
-        # Financial value (if available from analysis)
-        if analysis_data and "contract_value" in analysis_data:
-            try:
-                value = float(analysis_data["contract_value"])
-                if value > 1000000:
-                    score += 25
-                elif value > 100000:
-                    score += 15
-                elif value > 10000:
-                    score += 5
-            except:
-                pass
+        # Draft/markup indicators (lower priority)
+        if any(word in filename for word in ["markup", "mark up", "draft"]):
+            score -= 10
+
+        # File size bonus
+        text_length = classification.get("text_length", 0)
+        if text_length > 100000:  # >100k chars
+            score += 15
+        elif text_length > 50000:  # >50k chars
+            score += 10
+        elif text_length > 20000:  # >20k chars
+            score += 5
 
         return score
 
     def identify_main_contract(
         self, contract_classifications: List[Dict]
     ) -> Optional[Dict]:
-        """Identify the main contract from a collection of documents"""
+        """Identify main contract from classifications"""
 
         if not contract_classifications:
             return None
@@ -199,8 +199,32 @@ class ContractIntelligenceService:
         # Sort by score (highest first)
         scored_docs.sort(key=lambda x: x["score"], reverse=True)
 
-        # Return the highest scoring document as main contract
-        main_contract = scored_docs[0]
+        # Look for clear indicators of the main contract
+        main_contract = None
+        primary_contracts = [
+            doc
+            for doc in scored_docs
+            if doc["classification"].get("document_type") == "PRIMARY_CONTRACT"
+        ]
+
+        if primary_contracts:
+            # Among primary contracts, look for the most definitive one
+            for doc in primary_contracts:
+                filename = doc["classification"].get("filename", "").lower()
+
+                if any(
+                    indicator in filename
+                    for indicator in ["executed", "clean", "final"]
+                ):
+                    main_contract = doc
+                    break
+
+            # If no clear main contract found, use highest scoring primary contract
+            if not main_contract:
+                main_contract = primary_contracts[0]
+        else:
+            # No primary contracts found, use highest scoring document
+            main_contract = scored_docs[0]
 
         # Add ranking metadata
         main_contract["classification"]["is_main_contract"] = True
@@ -208,188 +232,65 @@ class ContractIntelligenceService:
         main_contract["classification"]["total_documents"] = len(
             contract_classifications
         )
+        main_contract["classification"]["ranking_reason"] = self._get_ranking_reason(
+            main_contract["classification"], primary_contracts
+        )
 
         return main_contract["classification"]
 
-    def analyze_contract_portfolio(self, file_paths: List[Path]) -> Dict:
-        """
-        Analyze a collection of contract documents
-        Returns classification and hierarchy analysis
-        """
+    def _get_ranking_reason(
+        self, main_contract: Dict, all_primary_contracts: List[Dict]
+    ) -> str:
+        """Explain why this contract was chosen as main"""
+        filename = main_contract.get("filename", "").lower()
 
-        results = {
-            "total_documents": len(file_paths),
-            "classifications": [],
-            "main_contract": None,
-            "supporting_documents": [],
-            "analysis_date": datetime.now().isoformat(),
-            "errors": [],
-        }
+        if "executed" in filename:
+            return "Identified as executed/signed contract"
+        elif "clean" in filename:
+            return "Identified as clean/final version"
+        elif "final" in filename:
+            return "Identified as final version"
+        elif len(all_primary_contracts) > 1:
+            return (
+                f"Highest scoring among {len(all_primary_contracts)} primary contracts"
+            )
+        else:
+            return "Only primary contract found"
 
-        # Classify all documents
-        for file_path in file_paths:
-            try:
-                # Extract text
-                document_text = extract_text_from_pdf(str(file_path))
+    def get_ranked_document_list(
+        self, contract_classifications: List[Dict]
+    ) -> List[Dict]:
+        """Get all documents ranked by importance"""
 
-                if not document_text or len(document_text.strip()) < 50:
-                    raise Exception("Insufficient text extracted")
+        if not contract_classifications:
+            return []
 
-                # Classify
-                classification = self.classify_document(document_text, file_path.name)
-                classification["file_path"] = str(file_path)
-                classification["text_length"] = len(document_text)
+        # Score all documents
+        scored_docs = []
+        for classification in contract_classifications:
+            score = self.score_document_importance(classification)
 
-                results["classifications"].append(classification)
+            # Add score and ranking info to classification
+            enhanced_classification = classification.copy()
+            enhanced_classification["importance_score"] = score
 
-            except Exception as e:
-                error_doc = {
-                    "filename": file_path.name,
-                    "file_path": str(file_path),
-                    "error": str(e),
-                    "document_type": "ERROR",
-                }
-                results["errors"].append(error_doc)
+            scored_docs.append(enhanced_classification)
 
-        # Identify main contract and supporting documents
-        if results["classifications"]:
-            main_contract = self.identify_main_contract(results["classifications"])
+        # Sort by score (highest first)
+        scored_docs.sort(key=lambda x: x["importance_score"], reverse=True)
 
-            if main_contract:
-                results["main_contract"] = main_contract
+        # Add rank numbers
+        for i, doc in enumerate(scored_docs, 1):
+            doc["rank"] = i
 
-                # Remaining documents are supporting
-                results["supporting_documents"] = [
-                    doc
-                    for doc in results["classifications"]
-                    if doc["filename"] != main_contract["filename"]
-                ]
+            # Determine document priority level
+            if i == 1:
+                doc["priority_level"] = "MAIN_CONTRACT"
+            elif doc.get("document_type") == "PRIMARY_CONTRACT" and i <= 3:
+                doc["priority_level"] = "HIGH_PRIORITY"
+            elif doc.get("recommendation") == "ANALYZE_FULLY":
+                doc["priority_level"] = "ANALYZE_RECOMMENDED"
+            else:
+                doc["priority_level"] = "SUPPORTING_DOCUMENT"
 
-                # Sort supporting docs by importance score
-                for doc in results["supporting_documents"]:
-                    doc["importance_score"] = self.score_document_importance(doc)
-
-                results["supporting_documents"].sort(
-                    key=lambda x: x["importance_score"], reverse=True
-                )
-
-        return results
-
-    def get_analysis_recommendations(self, portfolio_analysis: Dict) -> Dict:
-        """Generate actionable recommendations from portfolio analysis"""
-
-        recommendations = {
-            "immediate_actions": [],
-            "full_analysis_candidates": [],
-            "manual_review_needed": [],
-            "estimated_cost": 0,
-            "estimated_time_minutes": 0,
-        }
-
-        # Main contract should always be analyzed if not done already
-        if portfolio_analysis.get("main_contract"):
-            main_contract = portfolio_analysis["main_contract"]
-            if main_contract.get("recommendation") in [
-                "ANALYZE_FULLY",
-                "REVIEW_MANUALLY",
-            ]:
-                recommendations["immediate_actions"].append(
-                    {
-                        "action": "analyze_main_contract",
-                        "filename": main_contract["filename"],
-                        "reason": "Primary contract document identified",
-                        "priority": "CRITICAL",
-                    }
-                )
-                recommendations["full_analysis_candidates"].append(main_contract)
-
-        # Add other high-value documents
-        for doc in portfolio_analysis.get("supporting_documents", []):
-            if doc.get("recommendation") == "ANALYZE_FULLY":
-                recommendations["full_analysis_candidates"].append(doc)
-            elif doc.get("recommendation") == "REVIEW_MANUALLY":
-                recommendations["manual_review_needed"].append(doc)
-
-        # Calculate estimates
-        full_analysis_count = len(recommendations["full_analysis_candidates"])
-        recommendations["estimated_cost"] = (
-            full_analysis_count * 0.10
-        )  # $0.10 per document
-        recommendations["estimated_time_minutes"] = (
-            full_analysis_count * 2
-        )  # 2 minutes per document
-
-        return recommendations
-
-
-# Integration with existing API
-class ContractIntelligenceAPI:
-    """API integration for contract intelligence"""
-
-    def __init__(self):
-        self.intelligence_service = ContractIntelligenceService()
-
-    def analyze_uploaded_contracts(self, db: Session, contract_ids: List[int]) -> Dict:
-        """Analyze multiple uploaded contracts and identify main contract"""
-
-        contracts = db.query(Contract).filter(Contract.id.in_(contract_ids)).all()
-
-        if not contracts:
-            raise Exception("No contracts found")
-
-        # Classify all documents
-        classifications = []
-
-        for contract in contracts:
-            try:
-                # Get decrypted text
-                raw_text = contract.raw_text
-
-                if not raw_text:
-                    continue
-
-                # Classify
-                classification = self.intelligence_service.classify_document(
-                    raw_text, contract.filename
-                )
-                classification["contract_id"] = contract.id
-                classification["text_length"] = len(raw_text)
-
-                classifications.append(classification)
-
-            except Exception as e:
-                print(f"Classification failed for contract {contract.id}: {e}")
-                continue
-
-        # Identify main contract
-        main_contract = self.intelligence_service.identify_main_contract(
-            classifications
-        )
-
-        # Generate recommendations
-        portfolio_analysis = {
-            "classifications": classifications,
-            "main_contract": main_contract,
-            "supporting_documents": (
-                [
-                    doc
-                    for doc in classifications
-                    if doc.get("contract_id") != main_contract.get("contract_id")
-                ]
-                if main_contract
-                else classifications
-            ),
-        }
-
-        recommendations = self.intelligence_service.get_analysis_recommendations(
-            portfolio_analysis
-        )
-
-        return {
-            "main_contract": main_contract,
-            "supporting_documents": portfolio_analysis["supporting_documents"],
-            "recommendations": recommendations,
-            "total_contracts": len(contracts),
-            "classified_contracts": len(classifications),
-            "analysis_date": datetime.now().isoformat(),
-        }
+        return scored_docs
