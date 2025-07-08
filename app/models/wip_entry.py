@@ -7,12 +7,16 @@ from sqlalchemy import (
     DateTime,
     Boolean,
     Text,
-    Decimal,
+    Numeric,  # Use Numeric instead of Decimal for SQLAlchemy column types
     func,
 )
 from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import relationship
+from decimal import Decimal  # Import Decimal from Python's standard library
+from app.core.database import Base  # Use the existing Base from your database module
+import json
 
-Base = declarative_base()
+# Remove the duplicate Base declaration since you're importing it
 
 
 class WIPEntry(Base):
@@ -25,12 +29,12 @@ class WIPEntry(Base):
     job_number = Column(String)
     business_field = Column(String)
     job_name = Column(String)
-    contract_amount = Column(Decimal)
+    contract_amount = Column(Numeric(15, 2))  # Use Numeric for database columns
 
     # Original contract values (for deviation comparison)
     original_job_number = Column(String)
     original_job_name = Column(String)
-    original_contract_amount = Column(Decimal)
+    original_contract_amount = Column(Numeric(15, 2))
 
     # Deviation tracking
     has_deviations = Column(Boolean, default=False)
@@ -42,6 +46,10 @@ class WIPEntry(Base):
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, onupdate=func.now())
     last_deviation_check = Column(DateTime)
+
+    # Add relationships
+    contract = relationship("Contract", back_populates="wip_entry")
+    creator = relationship("User")
 
     @property
     def deviations(self):

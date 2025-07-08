@@ -46,6 +46,9 @@ class Contract(Base):
     intelligence = relationship(
         "ContractIntelligence", back_populates="contract", uselist=False
     )
+    wip_entry = relationship(
+        "WIPEntry", back_populates="contract", uselist=False
+    )  # Added WIP relationship
 
     # Indexes for performance
     __table_args__ = (
