@@ -380,23 +380,3 @@ async def get_contract_summary(
             "text_length": text_length,
             "actions": ["analyze_contract"] if text_length > 0 else ["extract_text"],
         }
-
-
-@router.get("/test-import")
-async def test_import():
-    """Test if simplified analyzer can be imported"""
-    try:
-        from app.services.simplified_contract_analyzer import SimplifiedContractAnalyzer
-
-        analyzer = SimplifiedContractAnalyzer()
-        return {
-            "import_successful": True,
-            "analyzer_class": str(type(analyzer)),
-            "message": "SimplifiedContractAnalyzer imported successfully",
-        }
-    except Exception as e:
-        return {
-            "import_successful": False,
-            "error": str(e),
-            "message": "Failed to import SimplifiedContractAnalyzer",
-        }

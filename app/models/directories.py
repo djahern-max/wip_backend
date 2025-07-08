@@ -1,4 +1,4 @@
-# app/models/contract_intelligence.py
+# app/models/directories.py
 from sqlalchemy import (
     Column,
     Integer,

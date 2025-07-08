@@ -1,22 +1,13 @@
-# app/models/wip_entry.py
+# app/models/wip_entry.py - Ultra simplified version
 from sqlalchemy import (
     Column,
     Integer,
     String,
     ForeignKey,
-    DateTime,
-    Boolean,
-    Text,
-    Numeric,  # Use Numeric instead of Decimal for SQLAlchemy column types
-    func,
+    Numeric,
 )
-from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
-from decimal import Decimal  # Import Decimal from Python's standard library
-from app.core.database import Base  # Use the existing Base from your database module
-import json
-
-# Remove the duplicate Base declaration since you're importing it
+from app.core.database import Base
 
 
 class WIPEntry(Base):
@@ -25,68 +16,10 @@ class WIPEntry(Base):
     id = Column(Integer, primary_key=True)
     contract_id = Column(Integer, ForeignKey("contracts.id"), unique=True)
 
-    # Editable WIP fields
+    # Just the 3 business fields
     job_number = Column(String)
-    business_field = Column(String)
     job_name = Column(String)
-    contract_amount = Column(Numeric(15, 2))  # Use Numeric for database columns
+    contract_amount = Column(Numeric(15, 2))
 
-    # Original contract values (for deviation comparison)
-    original_job_number = Column(String)
-    original_job_name = Column(String)
-    original_contract_amount = Column(Numeric(15, 2))
-
-    # Deviation tracking
-    has_deviations = Column(Boolean, default=False)
-    deviation_fields = Column(Text)  # JSON array of fields that deviate
-    deviation_notes = Column(Text)  # User explanation for deviations
-
-    status = Column(String, default="ACTIVE")
-    created_by = Column(Integer, ForeignKey("users.id"))
-    created_at = Column(DateTime, server_default=func.now())
-    updated_at = Column(DateTime, onupdate=func.now())
-    last_deviation_check = Column(DateTime)
-
-    # Add relationships
+    # Relationships
     contract = relationship("Contract", back_populates="wip_entry")
-    creator = relationship("User")
-
-    @property
-    def deviations(self):
-        """Get current deviations from contract"""
-        deviations = []
-
-        if self.job_number != self.original_job_number:
-            deviations.append(
-                {
-                    "field": "job_number",
-                    "field_label": "Job Number",
-                    "contract_value": self.original_job_number,
-                    "wip_value": self.job_number,
-                    "severity": "medium",
-                }
-            )
-
-        if self.job_name != self.original_job_name:
-            deviations.append(
-                {
-                    "field": "job_name",
-                    "field_label": "Job Name",
-                    "contract_value": self.original_job_name,
-                    "wip_value": self.job_name,
-                    "severity": "low",
-                }
-            )
-
-        if self.contract_amount != self.original_contract_amount:
-            deviations.append(
-                {
-                    "field": "contract_amount",
-                    "field_label": "Contract Amount",
-                    "contract_value": str(self.original_contract_amount),
-                    "wip_value": str(self.contract_amount),
-                    "severity": "high",  # Amount changes are critical
-                }
-            )
-
-        return deviations

@@ -14,62 +14,61 @@ from app.api.auth import get_current_active_user
 from app.models.user import User
 from app.services.contract_intelligence_service import ContractIntelligenceService
 from app.services.pdf_extractor import extract_text_from_pdf
+from app.schemas import (
+    AnalyzeDirectoryRequest,
+    DirectoryAnalysisResponse,
+    RankedDocument,
+)
 
 router = APIRouter()
 
 
-# Request Model
-class AnalyzeDirectoryRequest(BaseModel):
-    directory_path: str
+# Endpoint to get directory contents (for UI directory picker)
+@router.post("/list-directory")
+async def list_directory(
+    request: AnalyzeDirectoryRequest,
+    current_user: User = Depends(get_current_active_user),
+):
+    """
+    List PDF files in a directory (for UI preview before analysis)
+    """
 
+    directory_path = Path(request.directory_path)
 
-# Response Models
-class RankedDocument(BaseModel):
-    filename: str
-    rank: int
-    importance_score: int
-    priority_level: str  # MAIN_CONTRACT, HIGH_PRIORITY, etc.
-    document_type: str
-    importance: str
-    status: str
-    summary: str
-    recommendation: str
-    is_main_contract: bool = False
-    ranking_reason: Optional[str] = None
-    file_path: str
-    text_length: int
+    if not directory_path.exists():
+        raise HTTPException(status_code=404, detail="Directory not found")
 
+    if not directory_path.is_dir():
+        raise HTTPException(status_code=400, detail="Path is not a directory")
 
-class DirectoryAnalysisResponse(BaseModel):
-    success: bool
-    message: str
-    job_name: str
-    job_number: str
+    pdf_files = list(directory_path.glob("*.pdf"))
 
-    # Main results - exactly like your script
-    main_contract: Optional[RankedDocument] = None
-    ranked_documents: List[RankedDocument]
+    file_list = []
+    for pdf_file in pdf_files:
+        file_info = {
+            "filename": pdf_file.name,
+            "file_path": str(pdf_file),
+            "file_size_kb": pdf_file.stat().st_size // 1024,
+            "file_size_mb": round(pdf_file.stat().st_size / (1024 * 1024), 2),
+        }
+        file_list.append(file_info)
 
-    # Summary stats - exactly like your script
-    total_documents: int
-    successful_scans: int
-    failed_scans: int
-    success_rate: float
+    # Sort by filename
+    file_list.sort(key=lambda x: x["filename"])
 
-    # Classification breakdown - exactly like your script
-    critical_documents: int
-    primary_contracts: int
-    executed_documents: int
-    recommended_for_analysis: int
+    job_name = directory_path.name
+    job_number = job_name[:4] if len(job_name) >= 4 else "UNKNOWN"
 
-    # Cost estimates - exactly like your script
-    estimated_scan_cost: float
-    estimated_analysis_cost: float
-    estimated_analysis_time_minutes: int
-
-    # Recommendations - exactly like your script
-    recommended_files: List[str]
-    failed_files: List[str]
+    return {
+        "success": True,
+        "directory_path": str(directory_path),
+        "job_name": job_name,
+        "job_number": job_number,
+        "total_pdf_files": len(pdf_files),
+        "files": file_list,
+        "estimated_scan_cost": len(pdf_files) * 0.02,
+        "estimated_scan_time_minutes": len(pdf_files) * 0.5,
+    }
 
 
 @router.post("/analyze-directory", response_model=DirectoryAnalysisResponse)
@@ -280,51 +279,3 @@ async def identify_main_contract_directory(
             "job_name": full_result.job_name if full_result else "Unknown",
             "suggestion": "Review documents manually",
         }
-
-
-# Endpoint to get directory contents (for UI directory picker)
-@router.post("/list-directory")
-async def list_directory(
-    request: AnalyzeDirectoryRequest,
-    current_user: User = Depends(get_current_active_user),
-):
-    """
-    List PDF files in a directory (for UI preview before analysis)
-    """
-
-    directory_path = Path(request.directory_path)
-
-    if not directory_path.exists():
-        raise HTTPException(status_code=404, detail="Directory not found")
-
-    if not directory_path.is_dir():
-        raise HTTPException(status_code=400, detail="Path is not a directory")
-
-    pdf_files = list(directory_path.glob("*.pdf"))
-
-    file_list = []
-    for pdf_file in pdf_files:
-        file_info = {
-            "filename": pdf_file.name,
-            "file_path": str(pdf_file),
-            "file_size_kb": pdf_file.stat().st_size // 1024,
-            "file_size_mb": round(pdf_file.stat().st_size / (1024 * 1024), 2),
-        }
-        file_list.append(file_info)
-
-    # Sort by filename
-    file_list.sort(key=lambda x: x["filename"])
-
-    job_name = directory_path.name
-    job_number = job_name[:4] if len(job_name) >= 4 else "UNKNOWN"
-
-    return {
-        "success": True,
-        "directory_path": str(directory_path),
-        "job_name": job_name,
-        "job_number": job_number,
-        "total_pdf_files": len(pdf_files),
-        "files": file_list,
-        "estimated_scan_cost": len(pdf_files) * 0.02,
-        "estimated_scan_time_minutes": len(pdf_files) * 0.5,
-    }
