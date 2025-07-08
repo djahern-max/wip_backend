@@ -1,15 +1,15 @@
 import requests
-import re
+import time
 from typing import Optional, Dict, Any
 from decimal import Decimal
 from datetime import datetime
 from app.core.config import settings
+import re
 
 
 class ComprehensiveClaudeAnalyzer:
     """
-    Comprehensive contract analyzer - extracts 15+ fields in one API call
-    Cost: ~$0.08-0.12 per contract (one-time analysis)
+    Comprehensive contract analyzer with retry logic for 529 errors
     """
 
     def __init__(self):
@@ -24,8 +24,10 @@ class ComprehensiveClaudeAnalyzer:
             "anthropic-version": "2023-06-01",
         }
 
-    def _ask_claude(self, prompt: str, max_tokens: int = 800) -> str:
-        """Send prompt to Claude and return response"""
+    def _ask_claude(
+        self, prompt: str, max_tokens: int = 800, max_retries: int = 3
+    ) -> str:
+        """Send prompt to Claude with retry logic for 529 errors"""
 
         data = {
             "model": "claude-3-sonnet-20240229",
@@ -33,22 +35,77 @@ class ComprehensiveClaudeAnalyzer:
             "messages": [{"role": "user", "content": prompt}],
         }
 
-        response = requests.post(
-            self.base_url, headers=self.headers, json=data, timeout=60
-        )
+        for attempt in range(max_retries + 1):
+            try:
+                response = requests.post(
+                    self.base_url, headers=self.headers, json=data, timeout=60
+                )
 
-        if response.status_code != 200:
-            raise Exception(
-                f"Claude API error: {response.status_code} - {response.text}"
-            )
+                if response.status_code == 200:
+                    result = response.json()
+                    return result["content"][0]["text"].strip()
 
-        result = response.json()
-        return result["content"][0]["text"].strip()
+                elif response.status_code == 529:
+                    # Overloaded error - wait and retry
+                    if attempt < max_retries:
+                        wait_time = (
+                            2**attempt
+                        ) * 5  # Exponential backoff: 5s, 10s, 20s
+                        print(
+                            f"Claude API overloaded (529). Retrying in {wait_time}s... (attempt {attempt + 1}/{max_retries + 1})"
+                        )
+                        time.sleep(wait_time)
+                        continue
+                    else:
+                        raise Exception(
+                            f"Claude API overloaded after {max_retries + 1} attempts. Please try again later."
+                        )
+
+                elif response.status_code == 429:
+                    # Rate limit - wait longer
+                    if attempt < max_retries:
+                        wait_time = 30 + (attempt * 10)  # 30s, 40s, 50s
+                        print(
+                            f"Claude API rate limited (429). Waiting {wait_time}s... (attempt {attempt + 1}/{max_retries + 1})"
+                        )
+                        time.sleep(wait_time)
+                        continue
+                    else:
+                        raise Exception(
+                            f"Claude API rate limited after {max_retries + 1} attempts."
+                        )
+
+                else:
+                    # Other error - don't retry
+                    raise Exception(
+                        f"Claude API error: {response.status_code} - {response.text}"
+                    )
+
+            except requests.exceptions.Timeout:
+                if attempt < max_retries:
+                    print(
+                        f"Request timeout. Retrying... (attempt {attempt + 1}/{max_retries + 1})"
+                    )
+                    time.sleep(5)
+                    continue
+                else:
+                    raise Exception("Request timeout after multiple attempts")
+
+            except requests.exceptions.RequestException as e:
+                if attempt < max_retries:
+                    print(
+                        f"Request error: {e}. Retrying... (attempt {attempt + 1}/{max_retries + 1})"
+                    )
+                    time.sleep(5)
+                    continue
+                else:
+                    raise Exception(f"Request failed after multiple attempts: {e}")
+
+        raise Exception("Unexpected error in retry loop")
 
     def extract_comprehensive_data(self, contract_text: str) -> Dict[str, Any]:
         """
-        Extract all contract data in one comprehensive API call
-        Returns data ready for ContractAnalysis table
+        Extract all contract data in one comprehensive API call with retry logic
         """
 
         prompt = f"""
@@ -75,18 +132,12 @@ class ComprehensiveClaudeAnalyzer:
         INSURANCE_AMOUNT: [insurance amount as number only]
         BOND_AMOUNT: [bond amount as number only]
         
-        Examples:
-        CONTRACT_NUMBER: 172-517
-        CONTRACT_VALUE: 1582389
-        AGREEMENT_DATE: 2023-09-19
-        INSURANCE_REQUIRED: YES
-        
         CONTRACT TEXT:
-        {contract_text}
+        {contract_text[:15000]}
         """
 
         try:
-            response = self._ask_claude(prompt, max_tokens=1000)
+            response = self._ask_claude(prompt, max_tokens=1000, max_retries=3)
             return self._parse_comprehensive_response(response)
 
         except Exception as e:
@@ -95,7 +146,7 @@ class ComprehensiveClaudeAnalyzer:
 
     def _parse_comprehensive_response(self, response: str) -> Dict[str, Any]:
         """Parse Claude's structured response into database-ready format"""
-
+        # ... (rest of your existing parsing logic remains the same)
         data = {
             "contract_number": None,
             "contract_name": None,
@@ -116,7 +167,7 @@ class ComprehensiveClaudeAnalyzer:
             "insurance_amount": None,
             "bond_amount": None,
             "ai_provider": "claude-3-sonnet",
-            "confidence_score": Decimal("0.85"),  # Default confidence
+            "confidence_score": Decimal("0.85"),
         }
 
         # Parse each line of the response
@@ -134,55 +185,38 @@ class ComprehensiveClaudeAnalyzer:
             # Map and clean each field
             if "CONTRACT_NUMBER" in key:
                 data["contract_number"] = self._clean_contract_number(value)
-
             elif "CONTRACT_NAME" in key:
-                data["contract_name"] = value[:255]  # Limit length
-
+                data["contract_name"] = value[:255]
             elif "CONTRACT_VALUE" in key:
                 data["contract_value"] = self._extract_decimal(value)
-
             elif "CONTRACTOR_NAME" in key:
                 data["contractor_name"] = value[:255]
-
             elif "SUBCONTRACTOR_NAME" in key:
                 data["subcontractor_name"] = value[:255]
-
             elif "OWNER_NAME" in key:
                 data["owner_name"] = value[:255]
-
             elif "AGREEMENT_DATE" in key:
                 data["agreement_date"] = self._parse_date(value)
-
             elif "START_DATE" in key:
                 data["start_date"] = self._parse_date(value)
-
             elif "END_DATE" in key:
                 data["end_date"] = self._parse_date(value)
-
             elif "PROJECT_LOCATION" in key:
                 data["project_location"] = value[:255]
-
             elif "WORK_DESCRIPTION" in key:
                 data["work_description"] = value[:500]
-
             elif "PROJECT_TYPE" in key:
                 data["project_type"] = value[:100]
-
             elif "PAYMENT_TERMS" in key:
                 data["payment_terms"] = value[:300]
-
             elif "RETAINAGE_PERCENTAGE" in key:
                 data["retainage_percentage"] = self._extract_decimal(value)
-
             elif "INSURANCE_REQUIRED" in key:
                 data["insurance_required"] = value.upper() == "YES"
-
             elif "BOND_REQUIRED" in key:
                 data["bond_required"] = value.upper() == "YES"
-
             elif "INSURANCE_AMOUNT" in key:
                 data["insurance_amount"] = self._extract_decimal(value)
-
             elif "BOND_AMOUNT" in key:
                 data["bond_amount"] = self._extract_decimal(value)
 
@@ -197,6 +231,8 @@ class ComprehensiveClaudeAnalyzer:
     def _extract_decimal(self, value: str) -> Optional[Decimal]:
         """Extract decimal number from string"""
         try:
+            import re
+
             numbers = re.findall(r"[\d.]+", value.replace(",", ""))
             if numbers:
                 return Decimal(numbers[0])
@@ -207,6 +243,8 @@ class ComprehensiveClaudeAnalyzer:
     def _parse_date(self, value: str) -> Optional[datetime]:
         """Parse date string to datetime"""
         try:
+            import re
+
             # Try YYYY-MM-DD format first
             if re.match(r"^\d{4}-\d{2}-\d{2}$", value):
                 return datetime.strptime(value, "%Y-%m-%d")
@@ -223,14 +261,13 @@ class ComprehensiveClaudeAnalyzer:
 
     def analyze_contract(self, contract_text: str) -> Dict[str, Any]:
         """
-        Main method: Comprehensive contract analysis
-        Returns all extracted data ready for database storage
+        Main method: Comprehensive contract analysis with retry logic
         """
 
         if not contract_text or len(contract_text.strip()) < 100:
             raise Exception("Contract text too short or empty")
 
-        # Extract all data in one call
+        # Extract all data in one call with retries
         extracted_data = self.extract_comprehensive_data(contract_text)
 
         # Add metadata
