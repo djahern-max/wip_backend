@@ -38,17 +38,13 @@ class Contract(Base):
     is_processed = Column(Boolean, default=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
-    # Relationships
+    # Relationships - FIXED: using correct class names
     company = relationship("Company", back_populates="contracts")
     analysis = relationship(
         "ContractAnalysis", back_populates="contract", uselist=False
     )
-    intelligence = relationship(
-        "ContractIntelligence", back_populates="contract", uselist=False
-    )
-    wip_entry = relationship(
-        "WIPEntry", back_populates="contract", uselist=False
-    )  # Added WIP relationship
+    directories = relationship("Directories", back_populates="contract", uselist=False)
+    wip_entry = relationship("WIPEntry", back_populates="contract", uselist=False)
 
     # Indexes for performance
     __table_args__ = (

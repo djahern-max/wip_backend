@@ -15,13 +15,13 @@ from app.core.database import Base
 import json
 
 
-class ContractIntelligence(Base):
+class Directories(Base):
     """
     Store AI classification results for contracts
     Enables fast retrieval and caching of document intelligence
     """
 
-    __tablename__ = "contract_intelligence"
+    __tablename__ = "directories"
 
     id = Column(Integer, primary_key=True, index=True)
     contract_id = Column(
@@ -51,7 +51,7 @@ class ContractIntelligence(Base):
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
     # Relationships
-    contract = relationship("Contract", back_populates="intelligence")
+    contract = relationship("Contract", back_populates="directories")
 
     @property
     def main_parties_list(self):
@@ -67,24 +67,4 @@ class ContractIntelligence(Base):
     def main_parties_list(self, value):
         """Set main parties from a list"""
         if value:
-            self.main_parties = json.dumps(value)
-        else:
-            self.main_parties = None
-
-    @property
-    def full_classification(self):
-        """Get full classification data as dict"""
-        if self.classification_data:
-            try:
-                return json.loads(self.classification_data)
-            except:
-                return {}
-        return {}
-
-    @full_classification.setter
-    def full_classification(self, value):
-        """Set full classification data from dict"""
-        if value:
-            self.classification_data = json.dumps(value)
-        else:
-            self.classification_data = None
+            self.main_parties = json.dum

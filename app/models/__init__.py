@@ -1,10 +1,10 @@
-# app/models/__init__.py - Updated with WIPEntry
+# app/models/__init__.py - Updated with Directories model
 from app.models.company import Company
 from app.models.user import User
 from app.models.contract import Contract
 from app.models.contract_analysis import ContractAnalysis
-from models.directories import ContractIntelligence
-from app.models.wip_entry import WIPEntry  # Added WIPEntry import
+from app.models.directories import Directories
+from app.models.wip_entry import WIPEntry
 
 # Export all models
 __all__ = [
@@ -12,6 +12,6 @@ __all__ = [
     "User",
     "Contract",
     "ContractAnalysis",
-    "ContractIntelligence",
+    "Directories",
     "WIPEntry",
 ]

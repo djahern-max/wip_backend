@@ -1,13 +1,13 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from api import directories
+from app.api import directories  # Fixed: added app. prefix
 from app.core.config import settings
 from app.api import (
     auth,
     users,
     contracts,
     wip_entry,
-)  # Added wip_entry
+)
 from fastapi.responses import PlainTextResponse
 from fastapi.routing import APIRoute
 
@@ -28,7 +28,7 @@ app.include_router(auth.router, prefix="/auth", tags=["authentication"])
 app.include_router(users.router, prefix="/users", tags=["users"])
 app.include_router(contracts.router, prefix="/contracts", tags=["contracts"])
 app.include_router(directories.router, prefix="/directories", tags=["directories"])
-app.include_router(wip_entry.router, prefix="/wip", tags=["wip"])  # Added WIP router
+app.include_router(wip_entry.router, prefix="/wip", tags=["wip"])
 
 
 @app.get("/")

@@ -1,6 +1,6 @@
-# app/api/contract_intelligence.py
+# app/api/directories.py
 """
-Contract Intelligence API - Works like the single_job_scanner.py script
+Directory Analysis API - Works like the single_job_scanner.py script
 """
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -14,7 +14,7 @@ from app.api.auth import get_current_active_user
 from app.models.user import User
 from app.services.contract_intelligence_service import ContractIntelligenceService
 from app.services.pdf_extractor import extract_text_from_pdf
-from app.schemas import (
+from app.schemas.directories import (
     AnalyzeDirectoryRequest,
     DirectoryAnalysisResponse,
     RankedDocument,

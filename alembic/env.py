@@ -12,7 +12,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
 from app.core.database import Base
 
 # Import all models to ensure they are registered
-from app.models import Company, User, Contract, ContractAnalysis
+from app.models import Company, User, Contract, ContractAnalysis, Directories, WIPEntry
 
 # this is the Alembic Config object
 config = context.config
