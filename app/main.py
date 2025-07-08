@@ -1,7 +1,13 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
-from app.api import auth, users, contracts, contract_intelligence
+from app.api import (
+    auth,
+    users,
+    contracts,
+    contract_intelligence,
+    wip_entry,
+)  # Added wip_entry
 from fastapi.responses import PlainTextResponse
 from fastapi.routing import APIRoute
 
@@ -24,6 +30,7 @@ app.include_router(contracts.router, prefix="/contracts", tags=["contracts"])
 app.include_router(
     contract_intelligence.router, prefix="/intelligence", tags=["intelligence"]
 )
+app.include_router(wip_entry.router, prefix="/wip", tags=["wip"])  # Added WIP router
 
 
 @app.get("/")
