@@ -119,3 +119,158 @@ def create_first_user(user: UserCreate, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(db_user)
     return db_user
+# WIP endpoints
+from app.schemas.wip import WIP as WIPSchema, WIPCreate, WIPUpdate
+from app.models.wip import WIP as WIPModel
+
+@router.get("/wip/", response_model=List[WIPSchema])
+def read_wip_items(
+    skip: int = 0, 
+    limit: int = 100, 
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(get_current_active_user)
+):
+    """Get all WIP items - requires authentication."""
+    wip_items = db.query(WIPModel).offset(skip).limit(limit).all()
+    return wip_items
+
+@router.post("/wip/", response_model=WIPSchema)
+def create_wip_item(
+    wip: WIPCreate,
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(get_current_active_user)
+):
+    """Create a new WIP item - requires authentication."""
+    db_wip = WIPModel(
+        job_number=wip.job_number,
+        project_name=wip.project_name
+    )
+    db.add(db_wip)
+    db.commit()
+    db.refresh(db_wip)
+    return db_wip
+
+@router.get("/wip/{wip_id}", response_model=WIPSchema)
+def read_wip_item(
+    wip_id: int,
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(get_current_active_user)
+):
+    """Get a specific WIP item - requires authentication."""
+    db_wip = db.query(WIPModel).filter(WIPModel.id == wip_id).first()
+    if db_wip is None:
+        raise HTTPException(status_code=404, detail="WIP item not found")
+    return db_wip
+
+@router.put("/wip/{wip_id}", response_model=WIPSchema)
+def update_wip_item(
+    wip_id: int,
+    wip_update: WIPUpdate,
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(get_current_active_user)
+):
+    """Update a WIP item - requires authentication."""
+    db_wip = db.query(WIPModel).filter(WIPModel.id == wip_id).first()
+    if db_wip is None:
+        raise HTTPException(status_code=404, detail="WIP item not found")
+    
+    update_data = wip_update.dict(exclude_unset=True)
+    for field, value in update_data.items():
+        setattr(db_wip, field, value)
+    
+    db.commit()
+    db.refresh(db_wip)
+    return db_wip
+
+@router.delete("/wip/{wip_id}")
+def delete_wip_item(
+    wip_id: int,
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(get_current_active_user)
+):
+    """Delete a WIP item - requires authentication."""
+    db_wip = db.query(WIPModel).filter(WIPModel.id == wip_id).first()
+    if db_wip is None:
+        raise HTTPException(status_code=404, detail="WIP item not found")
+    
+    db.delete(db_wip)
+    db.commit()
+    return {"message": "WIP item deleted successfully"}
+
+# WIP endpoints
+from app.schemas.wip import WIP as WIPSchema, WIPCreate, WIPUpdate
+from app.models.wip import WIP as WIPModel
+
+@router.get("/wip/", response_model=List[WIPSchema])
+def read_wip_items(
+    skip: int = 0, 
+    limit: int = 100, 
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(get_current_active_user)
+):
+    """Get all WIP items - requires authentication."""
+    wip_items = db.query(WIPModel).offset(skip).limit(limit).all()
+    return wip_items
+
+@router.post("/wip/", response_model=WIPSchema)
+def create_wip_item(
+    wip: WIPCreate,
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(get_current_active_user)
+):
+    """Create a new WIP item - requires authentication."""
+    db_wip = WIPModel(
+        job_number=wip.job_number,
+        project_name=wip.project_name
+    )
+    db.add(db_wip)
+    db.commit()
+    db.refresh(db_wip)
+    return db_wip
+
+@router.get("/wip/{wip_id}", response_model=WIPSchema)
+def read_wip_item(
+    wip_id: int,
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(get_current_active_user)
+):
+    """Get a specific WIP item - requires authentication."""
+    db_wip = db.query(WIPModel).filter(WIPModel.id == wip_id).first()
+    if db_wip is None:
+        raise HTTPException(status_code=404, detail="WIP item not found")
+    return db_wip
+
+@router.put("/wip/{wip_id}", response_model=WIPSchema)
+def update_wip_item(
+    wip_id: int,
+    wip_update: WIPUpdate,
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(get_current_active_user)
+):
+    """Update a WIP item - requires authentication."""
+    db_wip = db.query(WIPModel).filter(WIPModel.id == wip_id).first()
+    if db_wip is None:
+        raise HTTPException(status_code=404, detail="WIP item not found")
+    
+    update_data = wip_update.dict(exclude_unset=True)
+    for field, value in update_data.items():
+        setattr(db_wip, field, value)
+    
+    db.commit()
+    db.refresh(db_wip)
+    return db_wip
+
+@router.delete("/wip/{wip_id}")
+def delete_wip_item(
+    wip_id: int,
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(get_current_active_user)
+):
+    """Delete a WIP item - requires authentication."""
+    db_wip = db.query(WIPModel).filter(WIPModel.id == wip_id).first()
+    if db_wip is None:
+        raise HTTPException(status_code=404, detail="WIP item not found")
+    
+    db.delete(db_wip)
+    db.commit()
+    return {"message": "WIP item deleted successfully"}
