@@ -112,7 +112,11 @@ def upload_wip_csv(
 
                 # Create new WIP item
                 logger.info(f"Creating WIP item: {job_number} - {project_name}")
-                wip_item = WIPModel(job_number=job_number, project_name=project_name)
+                wip_item = WIPModel(
+                    job_number=job_number,
+                    project_name=project_name,
+                    user_id=current_user.id,
+                )
 
                 db.add(wip_item)
                 created_items.append(
